@@ -1,0 +1,401 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>EduTrack | Academic Performance</title>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.31/jspdf.plugin.autotable.min.js"></script>
+
+    <style>
+        :root {
+            --primary: #4e73df;
+            --secondary: #858796;
+            --success: #1cc88a;
+            --danger: #e74a3b;
+            --dark: #2e3759;
+        }
+
+        * { box-sizing: border-box; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+        
+        body { 
+            margin: 0; 
+            background: #f8f9fc;
+            color: #333;
+        }
+
+        .navbar {
+            background: var(--dark);
+            color: white;
+            padding: 1rem 2rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+
+        .container {
+            max-width: 1100px;
+            margin: 30px auto;
+            background: white;
+            padding: 30px;
+            border-radius: 15px;
+            box-shadow: 0 0 20px rgba(0,0,0,0.05);
+        }
+
+        .card {
+            border: 1px solid #e3e6f0;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+
+        input, select {
+            padding: 12px;
+            margin: 10px 5px;
+            border-radius: 8px;
+            border: 1px solid #d1d3e2;
+            width: calc(33% - 20px);
+            min-width: 200px;
+        }
+
+        button {
+            padding: 12px 25px;
+            cursor: pointer;
+            border: none;
+            border-radius: 8px;
+            font-weight: 600;
+            transition: 0.3s;
+            background: var(--primary);
+            color: white;
+        }
+
+        button:hover { opacity: 0.9; transform: translateY(-1px); }
+        
+        .btn-outline { background: transparent; border: 1px solid var(--primary); color: var(--primary); }
+        .logout { background: var(--danger); }
+        
+        table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+        th { background: #f8f9fc; color: var(--secondary); text-transform: uppercase; font-size: 0.8rem; }
+        th, td { padding: 15px; text-align: left; border-bottom: 1px solid #eff2f7; }
+        
+        .pass { color: var(--success); font-weight: bold; }
+        .fail { color: var(--danger); font-weight: bold; }
+
+        .hidden { display: none; }
+        .stats-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 15px; margin-bottom: 20px; }
+        .stat-box { background: #f8f9fc; padding: 15px; border-radius: 10px; border-left: 4px solid var(--primary); }
+    </style>
+</head>
+
+<body>
+
+<div class="navbar">
+    <div style="font-size: 1.5rem; font-weight: bold;">EduTrack Pro</div>
+    <div id="userDisplay"></div>
+</div>
+
+<div class="container">
+
+    <div id="loginPage">
+        <div style="text-align: center; max-width: 400px; margin: auto;">
+            <h2 style="color: var(--dark)">Welcome Back</h2>
+            <input id="loginUser" placeholder="Username" style="width: 100%"><br>
+            <input id="loginPass" type="password" placeholder="Password" style="width: 100%"><br>
+            <button onclick="login()" style="width: 100%; margin-top: 15px;">Secure Login</button>
+            <p>New here? <span class="link" onclick="showSignup()" style="color: var(--primary); cursor: pointer;">Create an Account</span></p>
+        </div>
+    </div>
+
+    <div id="signupPage" class="hidden">
+        <h2>System Registration</h2>
+        <input id="signupUser" placeholder="Full Name">
+        <input id="signupPass" type="password" placeholder="Choose Password">
+        <select id="signupRole" onchange="toggleFields()">
+            <option value="student">Role: Student</option>
+            <option value="faculty">Role: Faculty</option>
+        </select>
+
+        <div id="studentFields">
+            <input id="signupUSN" placeholder="University Serial No (USN)">
+            <select id="signupSem">
+                <option value="">Select Semester</option>
+                <option value="1">Semester 1</option>
+                <option value="2">Semester 2</option>
+            </select>
+            <input id="signupSection" placeholder="Section (e.g., A, B)">
+        </div>
+
+        <button onclick="signup()">Register Account</button>
+        <button class="btn-outline" onclick="showLogin()">Back to Login</button>
+    </div>
+
+    <div id="facultyPage" class="hidden">
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+            <h2>Faculty Grade Entry</h2>
+            <button class="logout" onclick="logout()">Sign Out</button>
+        </div>
+
+        <div class="card">
+            <h4>Entry Form</h4>
+            <input id="studentUSN" placeholder="Search USN..." onkeyup="loadSubjectsByUSN()">
+            <select id="subject"><option>Select Student First</option></select>
+            <input id="internal" type="number" placeholder="Internal (Max 40)">
+            <input id="external" type="number" placeholder="External (Max 60)">
+            <div style="margin-top: 10px;">
+                <button onclick="addOrUpdate()" id="saveBtn">Save Record</button>
+                <button class="btn-outline" onclick="resetForm()">Clear Form</button>
+            </div>
+        </div>
+
+        <div id="facultyStats" class="stats-grid"></div>
+
+        <table>
+            <thead>
+                <tr><th>USN</th><th>Subject</th><th>Int.</th><th>Ext.</th><th>Total</th><th>Status</th><th>Actions</th></tr>
+            </thead>
+            <tbody id="records"></tbody>
+        </table>
+    </div>
+
+    <div id="studentPage" class="hidden">
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+            <h2 id="welcomeMsg">Student Portal</h2>
+            <button class="logout" onclick="logout()">Sign Out</button>
+        </div>
+
+        <div class="stats-grid">
+            <div class="stat-box"><div>GPA</div><h3 id="cgpa">0.0</h3></div>
+            <div class="stat-box"><div>Grade</div><h3 id="grade">-</h3></div>
+            <div class="stat-box"><div>Attendance</div><h3>92%</h3></div>
+            <div class="stat-box"><div>Credits</div><h3 id="totalSubjects">0</h3></div>
+        </div>
+
+        <div class="card">
+            <div id="studentInfo" style="margin-bottom: 15px; line-height: 1.6;"></div>
+            <table>
+                <thead>
+                    <tr><th>Subject</th><th>Internal</th><th>External</th><th>Total</th><th>GP</th><th>Status</th></tr>
+                </thead>
+                <tbody id="myMarks"></tbody>
+            </table>
+            <div style="margin-top: 20px;">
+                <button onclick="generateReportCard()">Download PDF Report</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+// --- Core Logic & Data Persistence ---
+let editIndex = -1;
+let selectedStudent = null;
+
+const UI = {
+    login: document.getElementById('loginPage'),
+    signup: document.getElementById('signupPage'),
+    faculty: document.getElementById('facultyPage'),
+    student: document.getElementById('studentPage')
+};
+
+function showSignup() { UI.login.classList.add("hidden"); UI.signup.classList.remove("hidden"); }
+function showLogin() { UI.signup.classList.add("hidden"); UI.login.classList.remove("hidden"); }
+
+function toggleFields() {
+    document.getElementById('studentFields').style.display = 
+        document.getElementById('signupRole').value === "faculty" ? "none" : "block";
+}
+
+// Data Helpers
+const getDB = (key) => JSON.parse(localStorage.getItem(key)) || [];
+const setDB = (key, data) => localStorage.setItem(key, JSON.stringify(data));
+
+function signup() {
+    let users = getDB("users");
+    let u = signupUser.value.trim(), p = signupPass.value.trim(), r = signupRole.value;
+
+    if (!u || !p) return alert("Validation Error: Missing Credentials");
+    if (users.find(x => x.username === u)) return alert("User already exists");
+
+    let obj = { username: u, password: p, role: r };
+    if (r === "student") {
+        obj.usn = signupUSN.value.toUpperCase();
+        obj.sem = signupSem.value;
+        obj.section = signupSection.value.toUpperCase();
+        if (!obj.usn || !obj.sem) return alert("Student details required");
+    }
+
+    users.push(obj);
+    setDB("users", users);
+    alert("Account Created Successfully!");
+    showLogin();
+}
+
+function login() {
+    let users = getDB("users");
+    let user = users.find(u => u.username === loginUser.value && u.password === loginPass.value);
+
+    if (!user) return alert("Access Denied: Invalid Username/Password");
+
+    localStorage.setItem("currentUser", JSON.stringify(user));
+    UI.login.classList.add("hidden");
+    
+    if (user.role === "faculty") {
+        UI.faculty.classList.remove("hidden");
+        displayRecords();
+    } else {
+        UI.student.classList.remove("hidden");
+        loadStudentMarks();
+    }
+}
+
+function logout() {
+    localStorage.removeItem("currentUser");
+    location.reload();
+}
+
+// --- Faculty Functions ---
+function loadSubjectsByUSN() {
+    let users = getDB("users");
+    selectedStudent = users.find(u => u.usn === studentUSN.value.toUpperCase());
+
+    const subDropdown = document.getElementById('subject');
+    if (!selectedStudent) {
+        subDropdown.innerHTML = "<option>Student Not Found</option>";
+        return;
+    }
+
+    let subs = selectedStudent.sem == "1" 
+        ? ["Mathematics I","Chemistry","Programming in C","AI","English"]
+        : ["Mathematics II","Physics","CAED","Electrical","Advanced C"];
+
+    subDropdown.innerHTML = subs.map(s => `<option value="${s}">${s}</option>`).join('');
+}
+
+function addOrUpdate() {
+    let rec = getDB("marks");
+    let iVal = parseInt(internal.value), eVal = parseInt(external.value);
+
+    if (!selectedStudent || isNaN(iVal) || isNaN(eVal)) return alert("Please fill all marks fields");
+    if (iVal > 40 || eVal > 60) return alert("Internal max: 40, External max: 60");
+
+    let data = {
+        usn: selectedStudent.usn,
+        subject: subject.value,
+        internal: iVal,
+        external: eVal,
+        total: iVal + eVal
+    };
+
+    if (editIndex === -1) {
+        let exists = rec.find(r => r.usn === data.usn && r.subject === data.subject);
+        if (exists) return alert("Subject record already exists for this USN");
+        rec.push(data);
+    } else {
+        rec[editIndex] = data;
+        editIndex = -1;
+        document.getElementById('saveBtn').innerText = "Save Record";
+    }
+
+    setDB("marks", rec);
+    resetForm();
+    displayRecords();
+}
+
+function resetForm() {
+    studentUSN.value = "";
+    internal.value = "";
+    external.value = "";
+    editIndex = -1;
+    document.getElementById('saveBtn').innerText = "Save Record";
+}
+
+function displayRecords() {
+    let rec = getDB("marks");
+    records.innerHTML = rec.map((r, i) => `
+        <tr>
+            <td>${r.usn}</td>
+            <td>${r.subject}</td>
+            <td>${r.internal}</td>
+            <td>${r.external}</td>
+            <td>${r.total}</td>
+            <td class="${r.total >= 40 ? 'pass' : 'fail'}">${r.total >= 40 ? 'PASS' : 'FAIL'}</td>
+            <td>
+                <button onclick="editRecord(${i})" style="padding: 5px 10px; font-size: 12px;">Edit</button>
+                <button class="logout" onclick="deleteRecord(${i})" style="padding: 5px 10px; font-size: 12px;">X</button>
+            </td>
+        </tr>
+    `).join('');
+}
+
+function editRecord(i) {
+    let r = getDB("marks")[i];
+    studentUSN.value = r.usn;
+    loadSubjectsByUSN();
+    subject.value = r.subject;
+    internal.value = r.internal;
+    external.value = r.external;
+    editIndex = i;
+    document.getElementById('saveBtn').innerText = "Update Record";
+}
+
+function deleteRecord(i) {
+    if(!confirm("Are you sure?")) return;
+    let rec = getDB("marks");
+    rec.splice(i, 1);
+    setDB("marks", rec);
+    displayRecords();
+}
+
+// --- Student Functions ---
+function loadStudentMarks() {
+    let user = JSON.parse(localStorage.getItem("currentUser"));
+    let rec = getDB("marks").filter(r => r.usn === user.usn);
+
+    studentInfo.innerHTML = `<strong>USN:</strong> ${user.usn} | <strong>Section:</strong> ${user.section} | <strong>Semester:</strong> ${user.sem}`;
+    document.getElementById('welcomeMsg').innerText = `Welcome, ${user.username}`;
+
+    let totalGP = 0;
+    myMarks.innerHTML = rec.map(r => {
+        let gp = r.total >= 90 ? 10 : r.total >= 80 ? 9 : r.total >= 70 ? 8 : r.total >= 60 ? 7 : r.total >= 50 ? 6 : r.total >= 40 ? 5 : 0;
+        totalGP += gp;
+        return `
+            <tr>
+                <td>${r.subject}</td>
+                <td>${r.internal}</td>
+                <td>${r.external}</td>
+                <td>${r.total}</td>
+                <td>${gp}</td>
+                <td class="${r.total >= 40 ? 'pass' : 'fail'}">${r.total >= 40 ? 'PASS' : 'FAIL'}</td>
+            </tr>`;
+    }).join('');
+
+    let gpa = (totalGP / rec.length || 0).toFixed(2);
+    cgpa.innerText = gpa;
+    totalSubjects.innerText = rec.length;
+    grade.innerText = gpa >= 9 ? "O" : gpa >= 8 ? "A+" : gpa >= 7 ? "A" : gpa >= 6 ? "B" : "Fail";
+}
+
+function generateReportCard() {
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF();
+    let user = JSON.parse(localStorage.getItem("currentUser"));
+    let rec = getDB("marks").filter(r => r.usn === user.usn);
+    
+    doc.setFontSize(18);
+    doc.text("OFFICIAL ACADEMIC TRANSCRIPT", 105, 20, { align: "center" });
+    doc.setFontSize(12);
+    doc.text(`Name: ${user.username} | USN: ${user.usn}`, 14, 35);
+    
+    doc.autoTable({
+        startY: 45,
+        head: [['Subject', 'Internal', 'External', 'Total', 'GP']],
+        body: rec.map(r => [r.subject, r.internal, r.external, r.total, r.total >= 40 ? 'Pass' : 'Fail'])
+    });
+
+    doc.save(`${user.usn}_Result.pdf`);
+}
+</script>
+</body>
+</html>
